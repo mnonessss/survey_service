@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+sqlalchemy
+asyncpg
+psycopg2-binary
+alembic
+pydantic
+pydantic-settings
+python-jose[cryptography]
+cryptography
+redis
+httpx
+python-multipart
+openpyxl
+hvac
+markupsafe

@@ -1,0 +1,31 @@
+include:
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
+
+stages:
+  - test
+  - security
+
+variables:
+  SAST_EXCLUDED_PATHS: "venv/,frontend/node_modules/,alembic/versions/"
+
+backend-lint:
+  stage: test
+  image: python:3.12-slim
+  script:
+    - pip install ruff
+    - ruff check backend/app --output-format=gitlab
+  allow_failure: false
+
+sast:
+  stage: security
+  allow_failure: false
+
+secret_detection:
+  stage: security
+  allow_failure: false
+
+dependency_scanning:
+  stage: security
+  allow_failure: false
