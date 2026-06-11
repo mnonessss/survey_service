@@ -17,8 +17,18 @@ export function getAccessToken() {
 let csrfInitPromise: Promise<void> | null = null;
 
 async function refreshCsrfToken() {
-  const res = await fetch(`${API_BASE}/auth/csrf`, { credentials: "include" });
-  if (!res.ok) throw new Error("Failed to initialize CSRF");
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/auth/csrf`, { credentials: "include" });
+  } catch {
+    throw new Error("Не удалось подключиться к серверу. Запустите бэкенд: docker compose up -d");
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(
+      typeof err.detail === "string" ? err.detail : "Не удалось инициализировать CSRF",
+    );
+  }
   const data = await res.json();
   csrfToken = data.csrf_token;
 }
@@ -103,9 +113,29 @@ function publicHeaders(sessionToken?: string): Record<string, string> {
   return headers;
 }
 
+export type SilentAuthResponse = {
+  status: string;
+  message?: string;
+  vk_user_id?: number;
+  access_token?: string;
+};
+
+async function silentAuthFetch(body: object): Promise<SilentAuthResponse> {
+  const res = await fetch(`${API_BASE}/api/auth/silent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(formatApiError(err.detail));
+  }
+  return res.json();
+}
+
 export const api = {
   initCsrf,
-  loginInit: () => apiFetch("/auth/login/init") as Promise<{ authorization_url: string; state: string }>,
+  silentAuth: silentAuthFetch,
   getMe: () => apiFetch("/auth/me"),
   getSurveys: () => apiFetch("/surveys/"),
   createSurvey: (body: object) => apiFetch("/surveys/", { method: "POST", body: JSON.stringify(body) }),

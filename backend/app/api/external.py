@@ -10,7 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
-from app.core.sanitize import escape_user_text, sanitize_export_row
+from app.core.sanitize import escape_user_text
+from app.services.response_display import format_export_header, format_export_value
 from app.core.vault import get_secret
 from app.db.database import get_db
 from app.models.external_api_key import ExternalApiKey
@@ -134,7 +135,9 @@ async def external_survey_responses(
     db: AsyncSession = Depends(get_db),
     _: ExternalApiKey = Depends(verify_external_api_key),
 ):
-    questions_result = await db.execute(select(Question).where(Question.survey_id == survey_id))
+    questions_result = await db.execute(
+        select(Question).where(Question.survey_id == survey_id).options(selectinload(Question.options))
+    )
     questions = {q.id: q for q in questions_result.scalars().all()}
 
     sessions_result = await db.execute(
@@ -148,11 +151,15 @@ async def external_survey_responses(
         answers_out: dict[str, str] = {}
         for answer in session.answers:
             question = questions.get(answer.question_id)
-            title = escape_user_text(question.title) if question else str(answer.question_id)
-            if answer.value_json is not None:
-                answers_out[title or ""] = sanitize_export_row(answer.value_json)
+            title = format_export_header(question.title) if question else str(answer.question_id)
+            if question:
+                answers_out[title or ""] = format_export_value(
+                    question,
+                    value_text=answer.value_text,
+                    value_json=answer.value_json,
+                )
             else:
-                answers_out[title or ""] = sanitize_export_row(answer.value_text)
+                answers_out[title or ""] = answer.value_text or ""
         rows.append(
             ExternalResponseRow(
                 session_id=session.id,

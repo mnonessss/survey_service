@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     VK_AUTH_AUDIENCE: str = ""
     VK_AUTH_JWKS_URL: str = ""
 
+    # VK Mini Apps — защищённый ключ для проверки sign при сквозной авторизации
+    VK_SERVICE_SECRET_KEY: str = ""
+
     # HashiCorp Vault
     VAULT_ADDR: str = ""
     VAULT_TOKEN: str = ""

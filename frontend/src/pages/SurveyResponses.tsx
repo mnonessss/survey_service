@@ -1,33 +1,53 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import {
+  Button,
+  CustomSelect,
+  FormItem,
+  Group,
+  Header,
+  HorizontalScroll,
+  ModalCard,
+  Placeholder,
+  Spinner,
+  Title,
+} from "@vkontakte/vkui";
 import { api, getAccessToken, initCsrf } from "../api/client";
 import { questionTypeLabel } from "../utils/questionHints";
 
-type SortBy = "completed_at" | "started_at" | "session_id";
+type SortBy = "completed_at" | "started_at";
 type SortOrder = "asc" | "desc";
+
+const SORT_BY_OPTIONS = [
+  { label: "Дате завершения", value: "completed_at" },
+  { label: "Дате начала", value: "started_at" },
+];
+
+const SORT_ORDER_OPTIONS = [
+  { label: "Сначала новые", value: "desc" },
+  { label: "Сначала старые", value: "asc" },
+];
 
 function formatDate(value: string | null) {
   if (!value) return "—";
   return new Date(value).toLocaleString("ru-RU");
 }
 
-function AnswerCell({ value, questionType }: { value: string; questionType: string }) {
-  const isImage =
+function isImageAnswer(value: string, questionType: string) {
+  return (
     (questionType === "IMAGE_UPLOAD" || questionType === "IMAGE_CHOICE") &&
-    value.startsWith("/uploads/");
-  if (isImage) {
-    return <img src={value} alt="Ответ" className="response-thumb" />;
-  }
-  return <span>{value}</span>;
+    value.startsWith("/uploads/")
+  );
 }
 
 export default function SurveyResponses() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("completed_at");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
-  const [filterQuestionId, setFilterQuestionId] = useState("");
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -41,18 +61,14 @@ export default function SurveyResponses() {
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, [load]);
 
-  const rows = useMemo(() => {
-    if (!data?.rows) return [];
-    return data.rows;
-  }, [data]);
+  const rows = useMemo(() => data?.rows ?? [], [data]);
 
   const exportXls = () => {
     if (!id) return;
-    const res = fetch(api.exportUrl(id), {
+    fetch(api.exportUrl(id), {
       headers: { Authorization: `Bearer ${getAccessToken()}` },
       credentials: "include",
-    });
-    res.then(async (r) => {
+    }).then(async (r) => {
       if (!r.ok) throw new Error("Export failed");
       const blob = await r.blob();
       const url = URL.createObjectURL(blob);
@@ -64,106 +80,109 @@ export default function SurveyResponses() {
     });
   };
 
-  if (error && !data) return <div className="card error">{error}</div>;
-  if (!data) return <p>Загрузка...</p>;
+  if (error && !data) {
+    return <Placeholder title="Ошибка">{error}</Placeholder>;
+  }
+
+  if (!data) {
+    return (
+      <Placeholder>
+        <Spinner size="l" />
+      </Placeholder>
+    );
+  }
 
   return (
     <>
-      <div className="card">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-          <div>
-            <h2>Ответы: {data.survey_title}</h2>
-            <p style={{ color: "#555", margin: 0 }}>Всего завершённых прохождений: {data.total}</p>
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Link to={`/surveys/${id}`} className="button-link secondary">
-              ← Редактор
-            </Link>
-            <button className="secondary" onClick={exportXls}>
-              Скачать XLS
-            </button>
-          </div>
-        </div>
-      </div>
+      <ModalCard
+        id="image-lightbox"
+        open={!!lightboxSrc}
+        onClose={() => setLightboxSrc(null)}
+        dismissButtonMode="inside"
+        dismissLabel="Закрыть"
+      >
+        {lightboxSrc && <img src={lightboxSrc} alt="Ответ" className="vk-lightbox-img" />}
+      </ModalCard>
 
-      <div className="card">
-        <h3>Фильтры и сортировка</h3>
-        <div className="responses-toolbar">
-          <div className="field" style={{ marginBottom: 0, minWidth: 200 }}>
-            <label>Сортировать по</label>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortBy)}>
-              <option value="completed_at">Дате завершения</option>
-              <option value="started_at">Дате начала</option>
-              <option value="session_id">ID сессии</option>
-            </select>
-          </div>
-          <div className="field" style={{ marginBottom: 0, minWidth: 160 }}>
-            <label>Порядок</label>
-            <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value as SortOrder)}>
-              <option value="desc">Сначала новые</option>
-              <option value="asc">Сначала старые</option>
-            </select>
-          </div>
-          <div className="field" style={{ marginBottom: 0, minWidth: 220 }}>
-            <label>Подсветить вопрос</label>
-            <select value={filterQuestionId} onChange={(e) => setFilterQuestionId(e.target.value)}>
-              <option value="">Все вопросы</option>
-              {data.questions.map((q: any) => (
-                <option key={q.id} value={q.id}>
-                  {q.title}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
+      <Group
+        header={<Header size="s">Ответы: {data.survey_title}</Header>}
+        description={`Всего завершённых прохождений: ${data.total}`}
+      >
+        <FormItem>
+          <Button mode="secondary" size="m" onClick={() => navigate(`/surveys/${id}`)}>
+            ← Редактор
+          </Button>
+          {" "}
+          <Button mode="secondary" size="m" onClick={exportXls}>
+            Скачать XLS
+          </Button>
+        </FormItem>
+      </Group>
+
+      <Group header={<Header size="s">Сортировка</Header>}>
+        <FormItem top="Сортировать по">
+          <CustomSelect
+            value={sortBy}
+            onChange={(_, v) => setSortBy((v as SortBy) ?? "completed_at")}
+            options={SORT_BY_OPTIONS}
+          />
+        </FormItem>
+        <FormItem top="Порядок">
+          <CustomSelect
+            value={sortOrder}
+            onChange={(_, v) => setSortOrder((v as SortOrder) ?? "desc")}
+            options={SORT_ORDER_OPTIONS}
+          />
+        </FormItem>
+      </Group>
 
       {rows.length === 0 ? (
-        <div className="card">
-          <p style={{ margin: 0, color: "#666" }}>Пока нет завершённых ответов.</p>
-        </div>
+        <Placeholder>Пока нет завершённых ответов.</Placeholder>
       ) : (
-        <div className="card responses-table-wrap">
-          <table className="responses-table">
-            <thead>
-              <tr>
-                <th>Завершено</th>
-                <th>Начато</th>
-                <th>Сессия</th>
-                {data.questions.map((q: any) => (
-                  <th
-                    key={q.id}
-                    className={filterQuestionId === q.id ? "highlight-col" : undefined}
-                    title={questionTypeLabel(q.question_type)}
-                  >
-                    {q.title}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row: any) => (
-                <tr key={row.session_id}>
-                  <td>{formatDate(row.completed_at)}</td>
-                  <td>{formatDate(row.started_at)}</td>
-                  <td className="mono">{String(row.session_id).slice(0, 8)}…</td>
-                  {data.questions.map((q: any) => {
-                    const answer = row.answers.find((a: any) => a.question_id === q.id);
-                    const value = answer?.display_value ?? "—";
-                    return (
-                      <td
-                        key={q.id}
-                        className={filterQuestionId === q.id ? "highlight-col" : undefined}
-                      >
-                        <AnswerCell value={value} questionType={q.question_type} />
-                      </td>
-                    );
-                  })}
+        <Group header={<Header size="s">Таблица ответов</Header>}>
+          <HorizontalScroll>
+            <table className="vk-responses-table">
+              <thead>
+                <tr>
+                  <th>Начато</th>
+                  <th>Завершено</th>
+                  {data.questions.map((q: any) => (
+                    <th key={q.id} title={questionTypeLabel(q.question_type)}>
+                      {q.title}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {rows.map((row: any) => (
+                  <tr key={row.session_id}>
+                    <td>{formatDate(row.started_at)}</td>
+                    <td>{formatDate(row.completed_at)}</td>
+                    {data.questions.map((q: any) => {
+                      const answer = row.answers.find((a: any) => a.question_id === q.id);
+                      const value = answer?.display_value ?? "—";
+                      return (
+                        <td key={q.id}>
+                          {isImageAnswer(value, q.question_type) ? (
+                            <button
+                              type="button"
+                              className="vk-response-thumb-btn"
+                              onClick={() => setLightboxSrc(value)}
+                            >
+                              <img src={value} alt="Ответ" className="vk-response-thumb" />
+                            </button>
+                          ) : (
+                            value
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </HorizontalScroll>
+        </Group>
       )}
     </>
   );

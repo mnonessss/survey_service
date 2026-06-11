@@ -57,6 +57,7 @@ def validate_csrf(request: Request) -> None:
         "/public/",
         "/api/v1/external/",
         "/auth/",
+        "/api/auth/",
         "/docs",
         "/redoc",
         "/health",

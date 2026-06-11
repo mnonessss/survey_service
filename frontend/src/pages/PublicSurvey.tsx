@@ -1,18 +1,53 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import {
+  Button,
+  Checkbox,
+  CustomSelect,
+  FormItem,
+  Group,
+  Header,
+  Input,
+  Panel,
+  PanelHeader,
+  Placeholder,
+  Slider,
+  Spacing,
+  Spinner,
+  Textarea,
+  Title,
+} from "@vkontakte/vkui";
 import { api } from "../api/client";
 import { questionHint } from "../utils/questionHints";
 
-function escapeHtml(text: string) {
-  return text
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+const TEXT_ANSWER_TYPES = ["TEXT", "RATING", "DATE", "IMAGE_UPLOAD"];
+const DRAFT_SAVE_DELAY_MS = 600;
+
+function sessionStorageKey(linkToken: string) {
+  return `survey_session:${linkToken}`;
 }
 
-const TEXT_ANSWER_TYPES = ["TEXT", "RATING", "DATE", "IMAGE_UPLOAD"];
+function loadStoredSession(linkToken: string) {
+  try {
+    const raw = localStorage.getItem(sessionStorageKey(linkToken));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { sessionId?: string; sessionToken?: string };
+    if (parsed.sessionId && parsed.sessionToken) {
+      return { sessionId: parsed.sessionId, sessionToken: parsed.sessionToken };
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function storeSession(linkToken: string, sessionId: string, sessionToken: string) {
+  localStorage.setItem(sessionStorageKey(linkToken), JSON.stringify({ sessionId, sessionToken }));
+}
+
+function clearStoredSession(linkToken: string) {
+  localStorage.removeItem(sessionStorageKey(linkToken));
+}
 
 function buildAnswerPayload(
   questions: any[],
@@ -41,6 +76,9 @@ export default function PublicSurvey() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  const [resuming, setResuming] = useState(false);
+  const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const resumeAttempted = useRef(false);
 
   useEffect(() => {
     if (!token) return;
@@ -50,39 +88,75 @@ export default function PublicSurvey() {
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, [token]);
 
+  const applyDraftAnswers = (draft: { answers?: unknown }) => {
+    if (!survey?.questions) return;
+    if (!draft?.answers || typeof draft.answers !== "object" || Array.isArray(draft.answers)) return;
+
+    const nextAnswers: Record<string, string> = {};
+    const nextMulti: Record<string, string[]> = {};
+    for (const q of survey.questions) {
+      const item = (draft.answers as Record<string, { value_text?: string; value_json?: unknown }>)[q.id];
+      if (!item) continue;
+      if (q.question_type === "MULTIPLE_CHOICE" && Array.isArray(item.value_json)) {
+        nextMulti[q.id] = item.value_json as string[];
+      } else if (item.value_text) {
+        nextAnswers[q.id] = item.value_text;
+      } else if (Array.isArray(item.value_json) && item.value_json.length) {
+        nextAnswers[q.id] = String(item.value_json[0]);
+      }
+    }
+    setAnswers(nextAnswers);
+    setMultiAnswers(nextMulti);
+  };
+
+  const beginSession = async (sid: string, stoken: string, persist: boolean) => {
+    if (!token) return;
+    setSessionId(sid);
+    setSessionToken(stoken);
+    if (persist) storeSession(token, sid, stoken);
+    const draft = await api.getDraft(sid, stoken);
+    applyDraftAnswers(draft);
+  };
+
   const start = async () => {
     if (!token || !survey) return;
     setError("");
     try {
       const res = await api.startSession(token);
-      setSessionId(res.session_id);
-      setSessionToken(res.session_token);
-      try {
-        const draft = await api.getDraft(res.session_id, res.session_token);
-        if (draft?.answers && typeof draft.answers === "object" && !Array.isArray(draft.answers)) {
-          const nextAnswers: Record<string, string> = {};
-          const nextMulti: Record<string, string[]> = {};
-          for (const q of survey.questions) {
-            const item = draft.answers[q.id];
-            if (!item) continue;
-            if (q.question_type === "MULTIPLE_CHOICE" && Array.isArray(item.value_json)) {
-              nextMulti[q.id] = item.value_json;
-            } else if (item.value_text) {
-              nextAnswers[q.id] = item.value_text;
-            } else if (Array.isArray(item.value_json) && item.value_json.length) {
-              nextAnswers[q.id] = String(item.value_json[0]);
-            }
-          }
-          setAnswers(nextAnswers);
-          setMultiAnswers(nextMulti);
-        }
-      } catch {
-        /* no saved draft */
-      }
+      await beginSession(res.session_id, res.session_token, true);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
   };
+
+  useEffect(() => {
+    if (!token || !survey || sessionId || resumeAttempted.current) return;
+    const stored = loadStoredSession(token);
+    if (!stored) return;
+
+    resumeAttempted.current = true;
+    setResuming(true);
+    beginSession(stored.sessionId, stored.sessionToken, false)
+      .catch(() => {
+        clearStoredSession(token);
+        setSessionId("");
+        setSessionToken("");
+      })
+      .finally(() => setResuming(false));
+  }, [token, survey, sessionId]);
+
+  useEffect(() => {
+    if (!sessionId || !sessionToken || !survey || done) return;
+
+    const timer = window.setTimeout(() => {
+      const payload = buildAnswerPayload(survey.questions, answers, multiAnswers);
+      api.saveDraft(sessionId, sessionToken, payload).catch(() => {
+        /* автосохранение не мешает заполнению */
+      });
+    }, DRAFT_SAVE_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [sessionId, sessionToken, survey, answers, multiAnswers, done]);
 
   const attachAnswerImage = async (questionId: string, file: File) => {
     if (!sessionId || !sessionToken) return;
@@ -98,18 +172,6 @@ export default function PublicSurvey() {
     }
   };
 
-  const saveDraft = async () => {
-    if (!sessionId || !sessionToken || !survey) return;
-    setError("");
-    try {
-      const payload = buildAnswerPayload(survey.questions, answers, multiAnswers);
-      await api.saveDraft(sessionId, sessionToken, payload);
-      alert("Черновик сохранён");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  };
-
   const submit = async () => {
     if (!sessionId || !sessionToken || !survey || submitting) return;
     setError("");
@@ -117,6 +179,7 @@ export default function PublicSurvey() {
     try {
       const payload = buildAnswerPayload(survey.questions, answers, multiAnswers);
       await api.submitSurvey(sessionId, sessionToken, payload);
+      if (token) clearStoredSession(token);
       setDone(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -125,129 +188,225 @@ export default function PublicSurvey() {
     }
   };
 
-  if (error && !survey) return <div className="container card error">{error}</div>;
-  if (!survey) return <div className="container">Загрузка...</div>;
-  if (done) return <div className="container card">Спасибо! Ответы сохранены.</div>;
+  if (error && !survey) {
+    return (
+      <Panel id="public">
+        <PanelHeader>Опрос</PanelHeader>
+        <Placeholder title="Ошибка">{error}</Placeholder>
+      </Panel>
+    );
+  }
+
+  if (!survey) {
+    return (
+      <Panel id="public">
+        <PanelHeader>Опрос</PanelHeader>
+        <Placeholder>
+          <Spinner size="l" />
+        </Placeholder>
+      </Panel>
+    );
+  }
+
+  if (done) {
+    return (
+      <Panel id="public">
+        <PanelHeader>Опрос</PanelHeader>
+        <Placeholder title="Спасибо!">Ответы сохранены.</Placeholder>
+      </Panel>
+    );
+  }
 
   return (
-    <div className="container">
-      <div className="card">
-        <h2>{escapeHtml(survey.title)}</h2>
-        {!sessionId ? (
-          <button onClick={start}>Начать опрос</button>
-        ) : (
-          <>
-            {survey.questions.map((q: any) => (
-              <div className="field" key={q.id}>
-                <label>{escapeHtml(q.title)}</label>
-                {questionHint(q.question_type) && (
-                  <p className="field-hint">{questionHint(q.question_type)}</p>
-                )}
-                {q.question_type === "TEXT" ? (
-                  <textarea
+    <Panel id="public">
+      <PanelHeader>{survey.title}</PanelHeader>
+      {survey.description && (
+        <Group>
+          <Title level="3" weight="3" style={{ padding: "0 16px" }}>
+            {survey.description}
+          </Title>
+        </Group>
+      )}
+
+      {resuming ? (
+        <Group>
+          <Placeholder>
+            <Spinner size="l" />
+            Загрузка ответов...
+          </Placeholder>
+        </Group>
+      ) : !sessionId ? (
+        <Group>
+          <FormItem>
+            <Button size="l" stretched onClick={start}>
+              Начать опрос
+            </Button>
+          </FormItem>
+        </Group>
+      ) : (
+        <>
+          {survey.questions.map((q: any) => (
+            <Group
+              key={q.id}
+              header={
+                <Header size="s">
+                  {q.title}
+                  {q.required ? " *" : ""}
+                </Header>
+              }
+            >
+              {questionHint(q.question_type) && (
+                <FormItem>
+                  <Title level="3" weight="3">
+                    {questionHint(q.question_type)}
+                  </Title>
+                </FormItem>
+              )}
+
+              {q.question_type === "TEXT" && (
+                <FormItem>
+                  <Textarea
                     value={answers[q.id] || ""}
                     onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
                     placeholder="Ваш ответ"
                   />
-                ) : q.question_type === "MULTIPLE_CHOICE" ? (
-                  <div>
+                </FormItem>
+              )}
+
+              {q.question_type === "MULTIPLE_CHOICE" &&
+                q.options?.map((o: any) => (
+                  <Checkbox
+                    key={o.id}
+                    checked={(multiAnswers[q.id] || []).includes(o.value)}
+                    onChange={(e) => {
+                      const current = multiAnswers[q.id] || [];
+                      const next = e.target.checked
+                        ? [...current, o.value]
+                        : current.filter((v) => v !== o.value);
+                      setMultiAnswers({ ...multiAnswers, [q.id]: next });
+                    }}
+                  >
+                    {o.label}
+                  </Checkbox>
+                ))}
+
+              {q.question_type === "SINGLE_CHOICE" && (
+                <FormItem>
+                  <CustomSelect
+                    placeholder="Выберите вариант"
+                    value={answers[q.id] || null}
+                    onChange={(_, v) => setAnswers({ ...answers, [q.id]: String(v ?? "") })}
+                    options={q.options?.map((o: any) => ({ label: o.label, value: o.value })) ?? []}
+                  />
+                </FormItem>
+              )}
+
+              {q.question_type === "IMAGE_CHOICE" && (
+                <FormItem>
+                  <div className="vk-image-choice-grid">
                     {q.options?.map((o: any) => (
-                      <label key={o.id} className="choice-option">
-                        <input
-                          type="checkbox"
-                          checked={(multiAnswers[q.id] || []).includes(o.value)}
-                          onChange={(e) => {
-                            const current = multiAnswers[q.id] || [];
-                            const next = e.target.checked
-                              ? [...current, o.value]
-                              : current.filter((v) => v !== o.value);
-                            setMultiAnswers({ ...multiAnswers, [q.id]: next });
-                          }}
-                        />
-                        <span>{escapeHtml(o.label)}</span>
-                      </label>
+                      <button
+                        key={o.id}
+                        type="button"
+                        className={
+                          answers[q.id] === o.value
+                            ? "vk-image-choice-btn vk-image-choice-btn--selected"
+                            : "vk-image-choice-btn"
+                        }
+                        onClick={() => setAnswers({ ...answers, [q.id]: o.value })}
+                        aria-label="Вариант изображения"
+                        aria-pressed={answers[q.id] === o.value}
+                      >
+                        <img src={o.image_url} alt="" />
+                      </button>
                     ))}
                   </div>
-                ) : q.question_type === "IMAGE_CHOICE" ? (
-                  <div className="image-choice-grid">
-                    {q.options?.map((o: any) => (
-                      <label key={o.id} className="image-choice-item">
-                        <input
-                          type="radio"
-                          name={q.id}
-                          checked={answers[q.id] === o.value}
-                          onChange={() => setAnswers({ ...answers, [q.id]: o.value })}
-                        />
-                        <img src={o.image_url} alt={o.label} />
-                        <span>{escapeHtml(o.label)}</span>
-                      </label>
-                    ))}
-                  </div>
-                ) : q.question_type === "IMAGE_UPLOAD" ? (
-                  <>
-                    <label className="file-input-label">
-                      {uploading[q.id] ? "Загрузка..." : "Прикрепить картинку"}
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/gif,image/webp"
-                        disabled={uploading[q.id]}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) attachAnswerImage(q.id, file);
-                          e.target.value = "";
-                        }}
-                      />
-                    </label>
-                    {answers[q.id] && (
-                      <img src={answers[q.id]} alt="Прикреплённое изображение" className="answer-image-preview" />
-                    )}
-                  </>
-                ) : q.question_type === "DATE" ? (
+                </FormItem>
+              )}
+
+              {q.question_type === "IMAGE_UPLOAD" && (
+                <FormItem>
                   <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    hidden
+                    ref={(el) => {
+                      fileRefs.current[q.id] = el;
+                    }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) attachAnswerImage(q.id, file);
+                      e.target.value = "";
+                    }}
+                  />
+                  <Button
+                    mode="secondary"
+                    stretched
+                    loading={uploading[q.id]}
+                    onClick={() => fileRefs.current[q.id]?.click()}
+                  >
+                    Прикрепить картинку
+                  </Button>
+                  {answers[q.id] && (
+                    <img src={answers[q.id]} alt="Ответ" className="vk-answer-preview" />
+                  )}
+                </FormItem>
+              )}
+
+              {q.question_type === "DATE" && (
+                <FormItem>
+                  <Input
                     type="date"
                     value={answers[q.id] || ""}
                     onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
                   />
-                ) : q.question_type === "RATING" ? (
-                  <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    step={1}
-                    placeholder="От 1 до 10"
-                    value={answers[q.id] || ""}
-                    onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
-                  />
-                ) : q.question_type === "SINGLE_CHOICE" ? (
-                  <select
-                    value={answers[q.id] || ""}
-                    onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
-                  >
-                    <option value="">— Выберите вариант —</option>
-                    {q.options?.map((o: any) => (
-                      <option key={o.id} value={o.value}>
-                        {escapeHtml(o.label)}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    value={answers[q.id] || ""}
-                    onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
-                  />
-                )}
-              </div>
-            ))}
-            {error && <p className="error">{error}</p>}
-            <button className="secondary" onClick={saveDraft}>
-              Сохранить черновик
-            </button>{" "}
-            <button onClick={submit} disabled={submitting}>
-              {submitting ? "Отправка..." : "Отправить"}
-            </button>
-          </>
-        )}
-      </div>
-    </div>
+                </FormItem>
+              )}
+
+              {q.question_type === "RATING" && (
+                <FormItem>
+                  <div className="vk-rating-slider">
+                    <Title level="2" weight="2" className="vk-rating-value">
+                      {answers[q.id] ? `${answers[q.id]} из 10` : "Выберите оценку от 1 до 10"}
+                    </Title>
+                    <Slider
+                      min={1}
+                      max={10}
+                      step={1}
+                      value={answers[q.id] ? Number(answers[q.id]) : 1}
+                      onChange={(value) => setAnswers({ ...answers, [q.id]: String(value) })}
+                      withTooltip
+                    />
+                    <div className="vk-rating-scale">
+                      <span>1 — низкая</span>
+                      <span>10 — высокая</span>
+                    </div>
+                  </div>
+                </FormItem>
+              )}
+            </Group>
+          ))}
+
+          {error && (
+            <Group>
+              <FormItem>
+                <Title level="3" style={{ color: "var(--vkui--color_text_negative)" }}>
+                  {error}
+                </Title>
+              </FormItem>
+            </Group>
+          )}
+
+          <Spacing size={8} />
+          <Group>
+            <FormItem>
+              <Button size="l" stretched onClick={submit} loading={submitting}>
+                Отправить
+              </Button>
+            </FormItem>
+          </Group>
+        </>
+      )}
+    </Panel>
   );
 }

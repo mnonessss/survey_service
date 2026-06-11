@@ -15,6 +15,7 @@ from app.db.database import get_db
 from app.models.enums import SurveyStatus, UserRole
 from app.models.question import Question
 from app.models.survey import Survey
+from app.models.survey_links import SurveyLinks
 from app.models.user import User
 from app.schemas.survey import CreateSurveyRequest, SurveyResponse, UpdateSurveyRequest
 from app.security.dependencies import get_current_user
@@ -29,6 +30,21 @@ router = APIRouter(
 )
 
 _researcher_or_admin = Depends(require_role(UserRole.RESEARCHER, UserRole.ADMIN))
+
+
+async def _published_survey_ids(db: AsyncSession, survey_ids: list[uuid.UUID]) -> set[uuid.UUID]:
+    if not survey_ids:
+        return set()
+    result = await db.execute(
+        select(SurveyLinks.survey_id).where(SurveyLinks.survey_id.in_(survey_ids)).distinct()
+    )
+    return set(result.scalars().all())
+
+
+def _to_survey_response(survey: Survey, published_ids: set[uuid.UUID]) -> SurveyResponse:
+    return SurveyResponse.model_validate(survey).model_copy(
+        update={"has_been_published": survey.id in published_ids},
+    )
 
 
 def _survey_select(survey_id: uuid.UUID | None, current_user: User):
@@ -48,7 +64,9 @@ async def get_all_surveys(
     result = await db.execute(
         _survey_select(None, current_user).order_by(Survey.created_at.desc())
     )
-    return result.scalars().all()
+    surveys = result.scalars().all()
+    published_ids = await _published_survey_ids(db, [survey.id for survey in surveys])
+    return [_to_survey_response(survey, published_ids) for survey in surveys]
 
 
 @router.get("/{survey_id}", response_model=SurveyResponse)
@@ -61,7 +79,8 @@ async def get_survey(
     survey = result.scalar_one_or_none()
     if not survey:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Survey not found")
-    return survey
+    published_ids = await _published_survey_ids(db, [survey.id])
+    return _to_survey_response(survey, published_ids)
 
 
 @router.post("/", response_model=SurveyResponse, dependencies=[_researcher_or_admin])

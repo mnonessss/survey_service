@@ -1,32 +1,13 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Panel, Placeholder, Spinner } from "@vkontakte/vkui";
 import { useLocation } from "react-router-dom";
 import { api, getAccessToken, initCsrf, setAccessToken } from "../api/client";
-
-type AuthStatus = "loading" | "authenticated" | "redirecting" | "denied";
-
-type AuthContextValue = {
-  status: AuthStatus;
-  userEmail: string;
-  error: string;
-};
-
-const AuthContext = createContext<AuthContextValue>({
-  status: "loading",
-  userEmail: "",
-  error: "",
-});
-
-export function useAuth() {
-  return useContext(AuthContext);
-}
+import { AuthContext, type AuthStatus } from "./authContextState";
+import { useAuth } from "./useAuth";
+import { parseVkLaunchParams } from "./vkLaunchParams";
 
 function isPublicPath(pathname: string) {
-  return pathname.startsWith("/s/") || pathname.startsWith("/auth/callback");
-}
-
-async function redirectToLogin() {
-  const { authorization_url } = await api.loginInit();
-  window.location.href = authorization_url;
+  return pathname.startsWith("/s/");
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -41,30 +22,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const token = getAccessToken();
-    if (!token) {
-      setStatus("redirecting");
-      redirectToLogin().catch((e) => {
-        setError(e instanceof Error ? e.message : String(e));
-        setStatus("denied");
-      });
-      return;
-    }
+    const authenticate = async () => {
+      if (!getAccessToken()) {
+        const launchParams = parseVkLaunchParams();
+        if (launchParams) {
+          const res = await api.silentAuth(launchParams);
+          if (res.status !== "success" || !res.access_token) {
+            throw new Error("Не удалось выполнить авторизацию");
+          }
+          setAccessToken(res.access_token);
+        }
+      }
 
-    initCsrf()
-      .then(() => api.getMe())
-      .then((user) => {
-        setUserEmail(user.email);
-        setStatus("authenticated");
-      })
-      .catch(() => {
-        setAccessToken("");
-        setStatus("redirecting");
-        redirectToLogin().catch((err) => {
-          setError(err instanceof Error ? err.message : String(err));
-          setStatus("denied");
-        });
-      });
+      await initCsrf();
+      const user = await api.getMe();
+      setUserEmail(user.email);
+      setStatus("authenticated");
+    };
+
+    authenticate().catch((e) => {
+      setError(e instanceof Error ? e.message : String(e));
+      setStatus("denied");
+    });
   }, [location.pathname]);
 
   return (
@@ -75,21 +54,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { status, error } = useAuth();
 
-  if (status === "loading" || status === "redirecting") {
+  if (status === "loading") {
     return (
-      <div className="container">
-        <p>{status === "redirecting" ? "Перенаправление на auth.vk.team..." : "Загрузка..."}</p>
-      </div>
+      <Panel>
+        <Placeholder>
+          <Spinner size="l" />
+          Авторизация...
+        </Placeholder>
+      </Panel>
     );
   }
 
   if (status !== "authenticated") {
     return (
-      <div className="container">
-        <div className="card error">
-          <p>{error || "Не удалось войти через auth.vk.team."}</p>
-        </div>
-      </div>
+      <Panel>
+        <Placeholder title="Доступ ограничен">
+          {error || "Откройте приложение через VK Mini Apps."}
+        </Placeholder>
+      </Panel>
     );
   }
 

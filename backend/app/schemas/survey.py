@@ -27,3 +27,4 @@ class SurveyResponse(BaseModel):
     created_by: uuid.UUID | None = None
     created_at: datetime.datetime
     updated_at: datetime.datetime
+    has_been_published: bool = False

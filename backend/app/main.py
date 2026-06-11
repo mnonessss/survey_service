@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api import auth, external, public, surveys
+from app.api import auth, external, public, silent_auth, surveys
 from app.core.config import settings
 from app.middleware.security_headers import SecurityMiddleware
 
@@ -31,6 +31,7 @@ async def health_check():
 
 
 app.include_router(auth.router)
+app.include_router(silent_auth.router)
 app.include_router(surveys.router)
 app.include_router(public.router)
 app.include_router(external.router)

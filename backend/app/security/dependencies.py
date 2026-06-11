@@ -33,6 +33,25 @@ async def _get_dev_user(db: AsyncSession) -> User:
     return user
 
 
+async def get_or_create_user_by_external_id(
+    db: AsyncSession,
+    *,
+    external_id: str,
+    email: str,
+) -> User:
+    result = await db.execute(select(User).where(User.external_id == external_id))
+    user = result.scalar_one_or_none()
+    if user:
+        if not user.is_active:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User is inactive")
+        return user
+    user = User(external_id=external_id, email=email, role=UserRole.RESEARCHER)
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
 async def get_or_create_user_from_claims(db: AsyncSession, claims: dict) -> User:
     external_id = claims.get("sub")
     if not external_id:

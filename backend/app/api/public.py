@@ -58,8 +58,8 @@ async def _get_active_link(db: AsyncSession, token: str) -> SurveyLinks:
 
 
 async def _get_open_session(
-    db: AsyncSession,
     session_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
     session_token: str = Header(..., alias=SESSION_TOKEN_HEADER),
 ) -> ResponseSession:
     result = await db.execute(select(ResponseSession).where(ResponseSession.id == session_id))

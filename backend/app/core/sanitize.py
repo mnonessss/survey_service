@@ -20,8 +20,13 @@ def sanitize_answer_payload(value_text: str | None, value_json: Any) -> tuple[st
 
 
 def sanitize_export_row(value: Any) -> str:
+    """Форматирует значение для экспорта (XLS/JSON API) без HTML-экранирования."""
     if value is None:
         return ""
-    if isinstance(value, (list, dict)):
-        return html.escape(json.dumps(value, ensure_ascii=False), quote=True)
-    return html.escape(str(value), quote=True)
+    if isinstance(value, list):
+        text = ", ".join(str(item) for item in value)
+    elif isinstance(value, dict):
+        text = json.dumps(value, ensure_ascii=False)
+    else:
+        text = str(value)
+    return html.unescape(text)
