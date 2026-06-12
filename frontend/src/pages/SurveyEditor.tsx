@@ -399,6 +399,11 @@ export default function SurveyEditor() {
   return (
     <>
       <Group header={<Header size="s">Редактор опроса</Header>}>
+        <FormItem>
+          <Button mode="secondary" size="m" onClick={() => navigate("/")}>
+            ← На главную
+          </Button>
+        </FormItem>
         <FormItem top="Название">
           <Input
             value={surveyTitle}
