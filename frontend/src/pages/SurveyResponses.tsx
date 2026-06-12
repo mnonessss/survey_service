@@ -96,12 +96,18 @@ export default function SurveyResponses() {
     <>
       <ModalCard
         id="image-lightbox"
+        className="vk-lightbox-modal"
+        size={1200}
         open={!!lightboxSrc}
         onClose={() => setLightboxSrc(null)}
         dismissButtonMode="inside"
         dismissLabel="Закрыть"
       >
-        {lightboxSrc && <img src={lightboxSrc} alt="Ответ" className="vk-lightbox-img" />}
+        {lightboxSrc && (
+          <div className="vk-lightbox-viewport">
+            <img src={lightboxSrc} alt="Ответ" className="vk-lightbox-img" />
+          </div>
+        )}
       </ModalCard>
 
       <Group

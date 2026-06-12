@@ -176,10 +176,28 @@ body,
   box-shadow: 0 0 0 2px var(--vkui--color_stroke_accent);
 }
 
+.vk-lightbox-modal {
+  width: min(96vw, 1200px) !important;
+  max-width: 96vw !important;
+}
+
+.vk-lightbox-modal [class*="container"] {
+  padding: 8px 8px 16px;
+}
+
+.vk-lightbox-viewport {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .vk-lightbox-img {
   display: block;
   width: 100%;
-  max-height: 70vh;
+  max-width: 100%;
+  max-height: calc(100dvh - 72px);
+  min-height: min(75dvh, 75vw);
   object-fit: contain;
   border-radius: 8px;
 }

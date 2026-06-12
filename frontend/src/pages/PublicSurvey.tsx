@@ -223,12 +223,18 @@ export default function PublicSurvey() {
     <Panel id="public">
       <ModalCard
         id="public-image-lightbox"
+        className="vk-lightbox-modal"
+        size={1200}
         open={!!lightboxSrc}
         onClose={() => setLightboxSrc(null)}
         dismissButtonMode="inside"
         dismissLabel="Закрыть"
       >
-        {lightboxSrc && <img src={lightboxSrc} alt="Увеличенное изображение" className="vk-lightbox-img" />}
+        {lightboxSrc && (
+          <div className="vk-lightbox-viewport">
+            <img src={lightboxSrc} alt="Увеличенное изображение" className="vk-lightbox-img" />
+          </div>
+        )}
       </ModalCard>
 
       <PanelHeader>{survey.title}</PanelHeader>
