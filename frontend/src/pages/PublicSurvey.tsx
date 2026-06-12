@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import { Icon24ViewOutline } from "@vkontakte/icons";
 import {
   Button,
   Checkbox,
   CustomSelect,
   FormItem,
   Group,
-  Header,
   Input,
+  ModalCard,
   Panel,
   PanelHeader,
   Placeholder,
@@ -77,6 +78,7 @@ export default function PublicSurvey() {
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [resuming, setResuming] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const resumeAttempted = useRef(false);
 
@@ -219,6 +221,16 @@ export default function PublicSurvey() {
 
   return (
     <Panel id="public">
+      <ModalCard
+        id="public-image-lightbox"
+        open={!!lightboxSrc}
+        onClose={() => setLightboxSrc(null)}
+        dismissButtonMode="inside"
+        dismissLabel="Закрыть"
+      >
+        {lightboxSrc && <img src={lightboxSrc} alt="Увеличенное изображение" className="vk-lightbox-img" />}
+      </ModalCard>
+
       <PanelHeader>{survey.title}</PanelHeader>
       {survey.description && (
         <Group>
@@ -246,22 +258,18 @@ export default function PublicSurvey() {
       ) : (
         <>
           {survey.questions.map((q: any) => (
-            <Group
-              key={q.id}
-              header={
-                <Header size="s">
-                  {q.title}
-                  {q.required ? " *" : ""}
-                </Header>
-              }
-            >
+            <Group key={q.id}>
               {questionHint(q.question_type) && (
                 <FormItem>
-                  <Title level="3" weight="3">
-                    {questionHint(q.question_type)}
-                  </Title>
+                  <p className="vk-question-hint">{questionHint(q.question_type)}</p>
                 </FormItem>
               )}
+              <FormItem>
+                <p className="vk-question-title">
+                  {q.title}
+                  {q.required ? " *" : ""}
+                </p>
+              </FormItem>
 
               {q.question_type === "TEXT" && (
                 <FormItem>
@@ -305,20 +313,31 @@ export default function PublicSurvey() {
                 <FormItem>
                   <div className="vk-image-choice-grid">
                     {q.options?.map((o: any) => (
-                      <button
-                        key={o.id}
-                        type="button"
-                        className={
-                          answers[q.id] === o.value
-                            ? "vk-image-choice-btn vk-image-choice-btn--selected"
-                            : "vk-image-choice-btn"
-                        }
-                        onClick={() => setAnswers({ ...answers, [q.id]: o.value })}
-                        aria-label="Вариант изображения"
-                        aria-pressed={answers[q.id] === o.value}
-                      >
-                        <img src={o.image_url} alt="" />
-                      </button>
+                      <div key={o.id} className="vk-image-choice-item">
+                        <div className="vk-image-choice-frame">
+                          <button
+                            type="button"
+                            className={
+                              answers[q.id] === o.value
+                                ? "vk-image-choice-btn vk-image-choice-btn--selected"
+                                : "vk-image-choice-btn"
+                            }
+                            onClick={() => setAnswers({ ...answers, [q.id]: o.value })}
+                            aria-label="Выбрать вариант"
+                            aria-pressed={answers[q.id] === o.value}
+                          >
+                            <img src={o.image_url} alt="" />
+                          </button>
+                          <button
+                            type="button"
+                            className="vk-image-choice-zoom"
+                            aria-label="Увеличить изображение"
+                            onClick={() => setLightboxSrc(o.image_url)}
+                          >
+                            <Icon24ViewOutline />
+                          </button>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </FormItem>

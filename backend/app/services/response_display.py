@@ -1,6 +1,7 @@
 import html
 from typing import Any
 
+from app.core.config import settings
 from app.core.sanitize import escape_user_text
 from app.models.enums import QuestionType
 from app.models.question import Question
@@ -35,6 +36,13 @@ def _plain_export_text(value: str) -> str:
     return html.unescape(value)
 
 
+def _export_media_url(path: str) -> str:
+    if path.startswith("http://") or path.startswith("https://"):
+        return path
+    base = settings.PUBLIC_APP_URL.rstrip("/")
+    return f"{base}{path}" if path.startswith("/") else path
+
+
 def format_export_value(question: Question, *, value_text: str | None, value_json: Any) -> str:
     if value_json is not None:
         if isinstance(value_json, list):
@@ -50,7 +58,10 @@ def format_export_value(question: Question, *, value_text: str | None, value_jso
     text = (value_text or "").strip()
     if not text:
         return ""
-    return _plain_export_text(text)
+    plain = _plain_export_text(text)
+    if question.question_type == QuestionType.IMAGE_UPLOAD:
+        return _export_media_url(plain)
+    return plain
 
 
 def format_export_header(title: str) -> str:
