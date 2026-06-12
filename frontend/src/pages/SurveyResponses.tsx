@@ -13,6 +13,7 @@ import {
   Title,
 } from "@vkontakte/vkui";
 import { api, getAccessToken, initCsrf } from "../api/client";
+import { getAnswerImageUrls } from "../utils/answerImages";
 import { questionTypeLabel } from "../utils/questionHints";
 
 type SortBy = "completed_at" | "started_at";
@@ -31,13 +32,6 @@ const SORT_ORDER_OPTIONS = [
 function formatDate(value: string | null) {
   if (!value) return "—";
   return new Date(value).toLocaleString("ru-RU");
-}
-
-function isImageAnswer(value: string, questionType: string) {
-  return (
-    (questionType === "IMAGE_UPLOAD" || questionType === "IMAGE_CHOICE") &&
-    value.startsWith("/uploads/")
-  );
 }
 
 export default function SurveyResponses() {
@@ -166,17 +160,24 @@ export default function SurveyResponses() {
                     <td>{formatDate(row.completed_at)}</td>
                     {data.questions.map((q: any) => {
                       const answer = row.answers.find((a: any) => a.question_id === q.id);
+                      const imageUrls = getAnswerImageUrls(answer, q.question_type);
                       const value = answer?.display_value ?? "—";
                       return (
                         <td key={q.id}>
-                          {isImageAnswer(value, q.question_type) ? (
-                            <button
-                              type="button"
-                              className="vk-response-thumb-btn"
-                              onClick={() => setLightboxSrc(value)}
-                            >
-                              <img src={value} alt="Ответ" className="vk-response-thumb" />
-                            </button>
+                          {imageUrls.length > 0 ? (
+                            <div className="vk-response-images">
+                              {imageUrls.map((url) => (
+                                <button
+                                  key={url}
+                                  type="button"
+                                  className="vk-response-thumb-btn"
+                                  onClick={() => setLightboxSrc(url)}
+                                  aria-label="Увеличить изображение"
+                                >
+                                  <img src={url} alt="Ответ" className="vk-response-thumb" />
+                                </button>
+                              ))}
+                            </div>
                           ) : (
                             value
                           )}

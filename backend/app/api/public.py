@@ -169,7 +169,10 @@ async def upload_answer_image(
     question = result.scalar_one_or_none()
     if not question:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
-    if question.question_type != QuestionType.IMAGE_UPLOAD:
+    if question.question_type not in {
+        QuestionType.IMAGE_UPLOAD,
+        QuestionType.IMAGE_UPLOAD_MULTIPLE,
+    }:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This question does not accept image uploads",

@@ -20,3 +20,4 @@ class QuestionType(enum.Enum):
     RATING = "RATING"
     DATE = "DATE"
     IMAGE_UPLOAD = "IMAGE_UPLOAD"
+    IMAGE_UPLOAD_MULTIPLE = "IMAGE_UPLOAD_MULTIPLE"

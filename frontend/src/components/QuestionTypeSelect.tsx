@@ -5,7 +5,8 @@ export const QUESTION_TYPE_OPTIONS = [
   { label: "Один вариант", value: "SINGLE_CHOICE" },
   { label: "Несколько вариантов", value: "MULTIPLE_CHOICE" },
   { label: "Выбор картинки", value: "IMAGE_CHOICE" },
-  { label: "Загрузка картинки респондентом", value: "IMAGE_UPLOAD" },
+  { label: "Одна картинка от респондента", value: "IMAGE_UPLOAD" },
+  { label: "Несколько картинок от респондента", value: "IMAGE_UPLOAD_MULTIPLE" },
   { label: "Рейтинг", value: "RATING" },
   { label: "Дата", value: "DATE" },
 ];

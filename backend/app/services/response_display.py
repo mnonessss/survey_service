@@ -5,7 +5,7 @@ from app.core.config import settings
 from app.core.sanitize import escape_user_text
 from app.models.enums import QuestionType
 from app.models.question import Question
-from app.services.question_validation import CHOICE_TYPES
+from app.services.question_validation import CHOICE_TYPES, IMAGE_UPLOAD_TYPES
 
 
 def format_answer_display(question: Question, *, value_text: str | None, value_json: Any) -> str:
@@ -14,7 +14,7 @@ def format_answer_display(question: Question, *, value_text: str | None, value_j
             rendered = ", ".join(str(item) for item in value_json)
         else:
             rendered = str(value_json)
-        if question.question_type in {QuestionType.IMAGE_UPLOAD, QuestionType.IMAGE_CHOICE}:
+        if question.question_type in IMAGE_UPLOAD_TYPES or question.question_type == QuestionType.IMAGE_CHOICE:
             return rendered
         return escape_user_text(rendered) or "—"
 
@@ -22,7 +22,7 @@ def format_answer_display(question: Question, *, value_text: str | None, value_j
     if not text:
         return "—"
 
-    if question.question_type in {QuestionType.IMAGE_UPLOAD, QuestionType.IMAGE_CHOICE}:
+    if question.question_type in IMAGE_UPLOAD_TYPES or question.question_type == QuestionType.IMAGE_CHOICE:
         return text
 
     return escape_user_text(text) or "—"
@@ -50,6 +50,13 @@ def format_export_value(question: Question, *, value_text: str | None, value_jso
                 labels_map = {opt.value: opt.label for opt in question.options}
                 parts = [_plain_export_text(labels_map.get(str(item), str(item))) for item in value_json]
                 return ", ".join(parts)
+            if question.question_type in IMAGE_UPLOAD_TYPES:
+                urls = [
+                    _export_media_url(str(item))
+                    for item in value_json
+                    if str(item).startswith("/uploads/")
+                ]
+                return ", ".join(urls)
             return ", ".join(
                 _plain_export_text(str(item)) if isinstance(item, str) else str(item) for item in value_json
             )
@@ -59,7 +66,7 @@ def format_export_value(question: Question, *, value_text: str | None, value_jso
     if not text:
         return ""
     plain = _plain_export_text(text)
-    if question.question_type == QuestionType.IMAGE_UPLOAD:
+    if question.question_type in IMAGE_UPLOAD_TYPES:
         return _export_media_url(plain)
     return plain
 

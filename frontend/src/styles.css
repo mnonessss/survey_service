@@ -128,10 +128,51 @@ body,
 
 .vk-answer-preview {
   display: block;
-  margin-top: 12px;
+  margin-top: 0;
   max-width: 100%;
   max-height: 200px;
   border-radius: 8px;
+  object-fit: cover;
+}
+
+.vk-upload-preview-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.vk-upload-preview-item {
+  position: relative;
+  width: 120px;
+}
+
+.vk-upload-preview-item .vk-response-thumb-btn {
+  width: 100%;
+}
+
+.vk-upload-remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: pointer;
+}
+
+.vk-response-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 280px;
 }
 
 .vk-responses-table {

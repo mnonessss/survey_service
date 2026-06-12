@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Icon24ViewOutline } from "@vkontakte/icons";
+import { Icon24DeleteOutline, Icon24ViewOutline } from "@vkontakte/icons";
 import {
   Button,
   Checkbox,
@@ -21,7 +21,7 @@ import {
 import { api } from "../api/client";
 import { questionHint } from "../utils/questionHints";
 
-const TEXT_ANSWER_TYPES = ["TEXT", "RATING", "DATE", "IMAGE_UPLOAD"];
+const TEXT_ANSWER_TYPES = ["TEXT", "RATING", "DATE"];
 const DRAFT_SAVE_DELAY_MS = 600;
 
 function sessionStorageKey(linkToken: string) {
@@ -55,15 +55,23 @@ function buildAnswerPayload(
   answers: Record<string, string>,
   multiAnswers: Record<string, string[]>,
 ) {
-  return questions.map((q: any) => ({
-    question_id: q.id,
-    value_text: TEXT_ANSWER_TYPES.includes(q.question_type) ? answers[q.id] || null : null,
-    value_json: q.question_type.includes("CHOICE")
-      ? q.question_type === "MULTIPLE_CHOICE"
-        ? multiAnswers[q.id] || []
-        : [answers[q.id]].filter(Boolean)
-      : null,
-  }));
+  return questions.map((q: any) => {
+    if (q.question_type === "IMAGE_UPLOAD") {
+      return { question_id: q.id, value_text: answers[q.id] || null, value_json: null };
+    }
+    if (q.question_type === "IMAGE_UPLOAD_MULTIPLE") {
+      return { question_id: q.id, value_text: null, value_json: multiAnswers[q.id] || [] };
+    }
+    return {
+      question_id: q.id,
+      value_text: TEXT_ANSWER_TYPES.includes(q.question_type) ? answers[q.id] || null : null,
+      value_json: q.question_type.includes("CHOICE")
+        ? q.question_type === "MULTIPLE_CHOICE"
+          ? multiAnswers[q.id] || []
+          : [answers[q.id]].filter(Boolean)
+        : null,
+    };
+  });
 }
 
 export default function PublicSurvey() {
@@ -99,7 +107,10 @@ export default function PublicSurvey() {
     for (const q of survey.questions) {
       const item = (draft.answers as Record<string, { value_text?: string; value_json?: unknown }>)[q.id];
       if (!item) continue;
-      if (q.question_type === "MULTIPLE_CHOICE" && Array.isArray(item.value_json)) {
+      if (
+        (q.question_type === "MULTIPLE_CHOICE" || q.question_type === "IMAGE_UPLOAD_MULTIPLE") &&
+        Array.isArray(item.value_json)
+      ) {
         nextMulti[q.id] = item.value_json as string[];
       } else if (item.value_text) {
         nextAnswers[q.id] = item.value_text;
@@ -160,19 +171,62 @@ export default function PublicSurvey() {
     return () => window.clearTimeout(timer);
   }, [sessionId, sessionToken, survey, answers, multiAnswers, done]);
 
-  const attachAnswerImage = async (questionId: string, file: File) => {
+  const attachAnswerImage = async (questionId: string, file: File, multiple: boolean) => {
     if (!sessionId || !sessionToken) return;
     setError("");
     setUploading((prev) => ({ ...prev, [questionId]: true }));
     try {
       const { url } = await api.uploadAnswerImage(sessionId, sessionToken, questionId, file);
-      setAnswers((prev) => ({ ...prev, [questionId]: url }));
+      if (multiple) {
+        setMultiAnswers((prev) => ({
+          ...prev,
+          [questionId]: [...(prev[questionId] || []), url],
+        }));
+      } else {
+        setAnswers((prev) => ({ ...prev, [questionId]: url }));
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setUploading((prev) => ({ ...prev, [questionId]: false }));
     }
   };
+
+  const removeUploadedImage = (questionId: string, url: string, multiple: boolean) => {
+    if (multiple) {
+      setMultiAnswers((prev) => ({
+        ...prev,
+        [questionId]: (prev[questionId] || []).filter((item) => item !== url),
+      }));
+    } else {
+      setAnswers((prev) => {
+        const next = { ...prev };
+        delete next[questionId];
+        return next;
+      });
+    }
+  };
+
+  const renderUploadedPreview = (url: string, questionId: string, multiple: boolean) => (
+    <div key={url} className="vk-upload-preview-item">
+      <button
+        type="button"
+        className="vk-response-thumb-btn"
+        onClick={() => setLightboxSrc(url)}
+        aria-label="Увеличить изображение"
+      >
+        <img src={url} alt="Ответ" className="vk-answer-preview" />
+      </button>
+      <button
+        type="button"
+        className="vk-upload-remove-btn"
+        aria-label="Удалить изображение"
+        onClick={() => removeUploadedImage(questionId, url, multiple)}
+      >
+        <Icon24DeleteOutline />
+      </button>
+    </div>
+  );
 
   const submit = async () => {
     if (!sessionId || !sessionToken || !survey || submitting) return;
@@ -360,7 +414,7 @@ export default function PublicSurvey() {
                     }}
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) attachAnswerImage(q.id, file);
+                      if (file) attachAnswerImage(q.id, file, false);
                       e.target.value = "";
                     }}
                   />
@@ -372,8 +426,39 @@ export default function PublicSurvey() {
                   >
                     Прикрепить картинку
                   </Button>
-                  {answers[q.id] && (
-                    <img src={answers[q.id]} alt="Ответ" className="vk-answer-preview" />
+                  {answers[q.id] && renderUploadedPreview(answers[q.id], q.id, false)}
+                </FormItem>
+              )}
+
+              {q.question_type === "IMAGE_UPLOAD_MULTIPLE" && (
+                <FormItem>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    hidden
+                    ref={(el) => {
+                      fileRefs.current[q.id] = el;
+                    }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) attachAnswerImage(q.id, file, true);
+                      e.target.value = "";
+                    }}
+                  />
+                  <Button
+                    mode="secondary"
+                    stretched
+                    loading={uploading[q.id]}
+                    onClick={() => fileRefs.current[q.id]?.click()}
+                  >
+                    Добавить картинку
+                  </Button>
+                  {(multiAnswers[q.id] || []).length > 0 && (
+                    <div className="vk-upload-preview-grid">
+                      {(multiAnswers[q.id] || []).map((url) =>
+                        renderUploadedPreview(url, q.id, true),
+                      )}
+                    </div>
                   )}
                 </FormItem>
               )}

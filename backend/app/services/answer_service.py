@@ -55,6 +55,21 @@ def validate_answers_for_submit(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="SINGLE_CHOICE allows exactly one option",
                 )
+        elif question.question_type == QuestionType.IMAGE_UPLOAD_MULTIPLE:
+            values = item.value_json if isinstance(item.value_json, list) else []
+            if not values:
+                if require_all_required and question.required:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Question {question.id} requires an answer",
+                    )
+                continue
+            for value in values:
+                if not str(value).startswith("/uploads/"):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Ответ должен содержать загруженные изображения",
+                    )
         else:
             text = (item.value_text or "").strip()
             if not text:

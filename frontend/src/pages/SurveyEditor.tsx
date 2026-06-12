@@ -504,7 +504,13 @@ export default function SurveyEditor() {
 
                 {q.question_type === "IMAGE_UPLOAD" && (
                   <Banner mode="tint" before={null}>
-                    Респондент прикрепит своё изображение при прохождении опроса
+                    Респондент прикрепит одно изображение при прохождении опроса
+                  </Banner>
+                )}
+
+                {q.question_type === "IMAGE_UPLOAD_MULTIPLE" && (
+                  <Banner mode="tint" before={null}>
+                    Респондент сможет прикрепить несколько изображений при прохождении опроса
                   </Banner>
                 )}
 

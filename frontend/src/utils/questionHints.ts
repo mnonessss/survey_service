@@ -9,7 +9,9 @@ export function questionHint(type: string): string {
     case "IMAGE_CHOICE":
       return "Выберите одну картинку из предложенных.";
     case "IMAGE_UPLOAD":
-      return "Прикрепите изображение в ответ (JPEG, PNG, GIF или WebP, до 5 МБ).";
+      return "Прикрепите одно изображение (JPEG, PNG, GIF или WebP, до 5 МБ).";
+    case "IMAGE_UPLOAD_MULTIPLE":
+      return "Можно прикрепить несколько изображений (JPEG, PNG, GIF или WebP, до 5 МБ каждое).";
     case "RATING":
       return "Оцените по шкале от 1 до 10, где 10 — наивысшая оценка.";
     case "DATE":
@@ -30,7 +32,9 @@ export function questionTypeLabel(type: string): string {
     case "IMAGE_CHOICE":
       return "Выбор картинки";
     case "IMAGE_UPLOAD":
-      return "Загрузка картинки";
+      return "Одна картинка";
+    case "IMAGE_UPLOAD_MULTIPLE":
+      return "Несколько картинок";
     case "RATING":
       return "Рейтинг";
     case "DATE":

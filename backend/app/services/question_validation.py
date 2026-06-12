@@ -15,12 +15,19 @@ CHOICE_TYPES = frozenset(
         QuestionType.IMAGE_CHOICE,
     }
 )
+IMAGE_UPLOAD_TYPES = frozenset(
+    {
+        QuestionType.IMAGE_UPLOAD,
+        QuestionType.IMAGE_UPLOAD_MULTIPLE,
+    }
+)
+
 NO_OPTION_TYPES = frozenset(
     {
         QuestionType.TEXT,
         QuestionType.RATING,
         QuestionType.DATE,
-        QuestionType.IMAGE_UPLOAD,
+        *IMAGE_UPLOAD_TYPES,
     }
 )
 
