@@ -157,7 +157,7 @@ async def issue_csrf():
         CSRF_COOKIE,
         wrapped,
         httponly=True,
-        samesite="lax",
+        samesite="none" if settings.is_production else "lax",
         secure=settings.is_production,
         max_age=60 * 60 * 12,
     )

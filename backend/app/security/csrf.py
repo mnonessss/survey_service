@@ -66,12 +66,24 @@ def validate_csrf(request: Request) -> None:
     if any(path.startswith(p) for p in exempt_prefixes):
         return
 
-    cookie = request.cookies.get(CSRF_COOKIE)
     header = request.headers.get(CSRF_HEADER)
-    if not cookie or not header:
+    if not header:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CSRF token missing")
+
+    header_raw = unwrap_csrf_token(header)
+    if not header_raw:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid CSRF token")
+
+    # VK Mini App в iframe: cookie csrf_token часто не сохраняется.
+    # При Bearer-авторизации достаточно подписанного заголовка X-CSRF-Token.
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        return
+
+    cookie = request.cookies.get(CSRF_COOKIE)
+    if not cookie:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CSRF token missing")
 
     cookie_raw = unwrap_csrf_token(cookie)
-    header_raw = unwrap_csrf_token(header)
-    if not cookie_raw or not header_raw or not hmac.compare_digest(cookie_raw, header_raw):
+    if not cookie_raw or not hmac.compare_digest(cookie_raw, header_raw):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid CSRF token")
