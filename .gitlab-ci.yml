@@ -18,6 +18,14 @@ backend-lint:
     - ruff check backend/app --output-format=gitlab
   allow_failure: false
 
+backend-tests:
+  stage: test
+  image: python:3.12-slim
+  script:
+    - pip install -r requirements-dev.txt
+    - pytest -v
+  allow_failure: false
+
 sast:
   stage: security
   allow_failure: false
