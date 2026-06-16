@@ -18,6 +18,7 @@ import {
 import { Icon24ChevronDown, Icon24ChevronUp, Icon24CopyOutline, Icon24DeleteOutline } from "@vkontakte/icons";
 import { api, getAccessToken, initCsrf } from "../api/client";
 import { QuestionTypeSelect } from "../components/QuestionTypeSelect";
+import { copyToClipboard } from "../utils/clipboard";
 import { questionTypeLabel } from "../utils/questionHints";
 
 const TEXT_CHOICE_TYPES = ["SINGLE_CHOICE", "MULTIPLE_CHOICE"];
@@ -365,8 +366,9 @@ export default function SurveyEditor() {
 
   const copyLink = async (linkId: string, url: string) => {
     try {
-      await navigator.clipboard.writeText(url);
+      await copyToClipboard(url);
       setCopiedLinkId(linkId);
+      setError("");
       window.setTimeout(() => {
         setCopiedLinkId((current) => (current === linkId ? null : current));
       }, 2000);
@@ -774,13 +776,13 @@ export default function SurveyEditor() {
             <SimpleCell
               key={l.id}
               subtitle={copiedLinkId === l.id ? "Скопировано в буфер обмена" : l.public_url}
-              href={l.public_url}
-              target="_blank"
+              multiline
+              onClick={() => window.open(l.public_url, "_blank", "noopener,noreferrer")}
               after={
                 <IconButton
+                  type="button"
                   aria-label="Скопировать ссылку"
                   onClick={(event) => {
-                    event.preventDefault();
                     event.stopPropagation();
                     void copyLink(l.id, l.public_url);
                   }}
