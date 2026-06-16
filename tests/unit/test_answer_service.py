@@ -69,3 +69,13 @@ def test_missing_required_answer_rejected():
     with pytest.raises(HTTPException) as exc:
         validate_answers_for_submit([question], [], require_all_required=True)
     assert "обязательный вопрос" in exc.value.detail.lower()
+
+
+def test_required_choice_can_be_empty_in_draft_mode():
+    question = _question(QuestionType.SINGLE_CHOICE, required=True)
+    result = validate_answers_for_submit(
+        [question],
+        [AnswerSubmitItem(question_id=question.id, value_json=[])],
+        require_all_required=False,
+    )
+    assert question.id not in result

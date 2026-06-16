@@ -44,7 +44,7 @@ def validate_answers_for_submit(
                     detail="Не выбран обязательный вариант ответа",
                 )
             if not values:
-                if question.required:
+                if require_all_required and question.required:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Не выбран обязательный вариант ответа",
