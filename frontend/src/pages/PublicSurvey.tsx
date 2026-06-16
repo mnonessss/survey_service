@@ -125,11 +125,11 @@ export default function PublicSurvey() {
 
   const beginSession = async (sid: string, stoken: string, persist: boolean) => {
     if (!token) return;
-    setSessionId(sid);
-    setSessionToken(stoken);
     if (persist) storeSession(token, sid, stoken);
     const draft = await api.getDraft(sid, stoken);
     applyDraftAnswers(draft);
+    setSessionId(sid);
+    setSessionToken(stoken);
   };
 
   const start = async () => {
