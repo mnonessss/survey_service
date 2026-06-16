@@ -89,6 +89,43 @@ async def test_public_survey_submit_flow(client: AsyncClient, auth_headers: dict
 
 
 @pytest.mark.asyncio
+async def test_public_survey_preserves_quotes_in_text(client: AsyncClient, auth_headers: dict[str, str]):
+    survey_title = 'Опрос "важный"'
+    question_title = 'Как вам сервис "поддержки"?'
+
+    survey = await client.post(
+        "/surveys/",
+        headers=auth_headers,
+        json={"title": survey_title, "description": 'Описание "тест"'},
+    )
+    assert survey.status_code == 200, survey.text
+    survey_id = survey.json()["id"]
+
+    question = await client.post(
+        f"/surveys/{survey_id}/questions",
+        headers=auth_headers,
+        json={
+            "title": question_title,
+            "question_type": "TEXT",
+            "required": False,
+            "order": 0,
+        },
+    )
+    assert question.status_code == 201, question.text
+
+    link = await client.post(f"/surveys/{survey_id}/links", headers=auth_headers, json={})
+    assert link.status_code == 201, link.text
+    token = link.json()["token"]
+
+    public = await client.get(f"/public/surveys/{token}")
+    assert public.status_code == 200, public.text
+    body = public.json()
+    assert body["title"] == survey_title
+    assert body["description"] == 'Описание "тест"'
+    assert body["questions"][0]["title"] == question_title
+
+
+@pytest.mark.asyncio
 async def test_public_survey_unknown_token(client: AsyncClient):
     response = await client.get("/public/surveys/unknown-token-value")
     assert response.status_code == 404

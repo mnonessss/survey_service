@@ -20,6 +20,7 @@ import {
 } from "@vkontakte/vkui";
 import { api } from "../api/client";
 import { questionHint } from "../utils/questionHints";
+import { toSessionResponseMediaUrl } from "../utils/answerImages";
 
 const TEXT_ANSWER_TYPES = ["TEXT", "RATING", "DATE"];
 const DRAFT_SAVE_DELAY_MS = 600;
@@ -208,15 +209,22 @@ export default function PublicSurvey() {
     }
   };
 
+  const responseImageSrc = (storagePath: string) => {
+    if (!sessionId || !sessionToken || !storagePath.startsWith("/uploads/responses/")) {
+      return storagePath;
+    }
+    return toSessionResponseMediaUrl(sessionId, sessionToken, storagePath);
+  };
+
   const renderUploadedPreview = (url: string, questionId: string, multiple: boolean) => (
     <div key={url} className="vk-upload-preview-item">
       <button
         type="button"
         className="vk-response-thumb-btn"
-        onClick={() => setLightboxSrc(url)}
+        onClick={() => setLightboxSrc(responseImageSrc(url))}
         aria-label="Увеличить изображение"
       >
-        <img src={url} alt="Ответ" className="vk-answer-preview" />
+        <img src={responseImageSrc(url)} alt="Ответ" className="vk-answer-preview" />
       </button>
       <button
         type="button"

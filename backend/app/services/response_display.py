@@ -1,7 +1,6 @@
 import html
 from typing import Any
 
-from app.core.config import settings
 from app.core.sanitize import escape_user_text
 from app.models.enums import QuestionType
 from app.models.question import Question
@@ -36,11 +35,12 @@ def _plain_export_text(value: str) -> str:
     return html.unescape(value)
 
 
-def _export_media_url(path: str) -> str:
-    if path.startswith("http://") or path.startswith("https://"):
-        return path
-    base = settings.PUBLIC_APP_URL.rstrip("/")
-    return f"{base}{path}" if path.startswith("/") else path
+def _export_image_label(count: int) -> str:
+    if count <= 0:
+        return ""
+    if count == 1:
+        return "1 изображение (см. в личном кабинете)"
+    return f"{count} изображения (см. в личном кабинете)"
 
 
 def format_export_value(question: Question, *, value_text: str | None, value_json: Any) -> str:
@@ -51,12 +51,8 @@ def format_export_value(question: Question, *, value_text: str | None, value_jso
                 parts = [_plain_export_text(labels_map.get(str(item), str(item))) for item in value_json]
                 return ", ".join(parts)
             if question.question_type in IMAGE_UPLOAD_TYPES:
-                urls = [
-                    _export_media_url(str(item))
-                    for item in value_json
-                    if str(item).startswith("/uploads/")
-                ]
-                return ", ".join(urls)
+                count = sum(1 for item in value_json if str(item).startswith("/uploads/"))
+                return _export_image_label(count)
             return ", ".join(
                 _plain_export_text(str(item)) if isinstance(item, str) else str(item) for item in value_json
             )
@@ -67,7 +63,7 @@ def format_export_value(question: Question, *, value_text: str | None, value_jso
         return ""
     plain = _plain_export_text(text)
     if question.question_type in IMAGE_UPLOAD_TYPES:
-        return _export_media_url(plain)
+        return _export_image_label(1) if plain.startswith("/uploads/") else ""
     return plain
 
 

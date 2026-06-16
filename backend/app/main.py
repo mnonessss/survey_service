@@ -2,9 +2,8 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
-from app.api import auth, external, public, silent_auth, surveys
+from app.api import auth, external, media, public, silent_auth, surveys
 from app.core.config import settings
 from app.middleware.security_headers import SecurityMiddleware
 
@@ -36,7 +35,6 @@ app.include_router(surveys.router)
 app.include_router(public.router)
 app.include_router(external.router)
 app.include_router(external.integrations_router)
+app.include_router(media.router)
 
-_upload_dir = Path(settings.UPLOAD_DIR)
-_upload_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=str(_upload_dir)), name="uploads")
+Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)

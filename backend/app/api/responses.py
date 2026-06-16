@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_owned_survey
-from app.core.sanitize import escape_user_text
 from app.db.database import get_db
 from app.models.user import User
 from app.security.dependencies import get_current_user
@@ -121,12 +120,12 @@ async def list_survey_responses(
 
     return SurveyResponsesListSchema(
         survey_id=survey.id,
-        survey_title=escape_user_text(survey.title) or "",
+        survey_title=survey.title or "",
         total=len(rows),
         questions=[
             ResponseQuestionSchema(
                 id=q.id,
-                title=escape_user_text(q.title) or "",
+                title=q.title or "",
                 question_type=q.question_type,
                 order=q.order,
             )

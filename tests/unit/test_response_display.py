@@ -13,16 +13,18 @@ def _question(qtype: QuestionType) -> Question:
     return q
 
 
-def test_export_single_image_upload_uses_full_url():
+def test_export_single_image_upload_uses_label_not_url():
     value = format_export_value(
         _question(QuestionType.IMAGE_UPLOAD),
         value_text="/uploads/responses/abc/photo.jpg",
         value_json=None,
     )
-    assert value == "http://testserver/uploads/responses/abc/photo.jpg"
+    assert value == "1 изображение (см. в личном кабинете)"
+    assert "http" not in value
+    assert "/uploads/" not in value
 
 
-def test_export_multiple_image_upload_joins_urls():
+def test_export_multiple_image_upload_uses_count_label():
     value = format_export_value(
         _question(QuestionType.IMAGE_UPLOAD_MULTIPLE),
         value_text=None,
@@ -31,9 +33,8 @@ def test_export_multiple_image_upload_joins_urls():
             "/uploads/responses/a/2.jpg",
         ],
     )
-    assert "http://testserver/uploads/responses/a/1.jpg" in value
-    assert "http://testserver/uploads/responses/a/2.jpg" in value
-    assert ", " in value
+    assert value == "2 изображения (см. в личном кабинете)"
+    assert "http" not in value
 
 
 def test_export_text_answer_is_escaped():

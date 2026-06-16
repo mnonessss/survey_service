@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.redis import redis_client
-from app.core.sanitize import escape_user_text, sanitize_answer_payload
+from app.core.sanitize import sanitize_answer_payload
 from app.db.database import get_db
 from app.models.answer import Answer
 from app.models.enums import QuestionType, SurveyStatus
@@ -87,12 +87,12 @@ async def get_public_survey(token: str, db: AsyncSession = Depends(get_db)):
     questions = list(questions_result.scalars().all())
     return PublicSurveySchema(
         id=survey.id,
-        title=escape_user_text(survey.title) or "",
-        description=escape_user_text(survey.description),
+        title=survey.title or "",
+        description=survey.description,
         questions=[
             PublicQuestionSchema(
                 id=q.id,
-                title=escape_user_text(q.title) or "",
+                title=q.title or "",
                 question_type=q.question_type,
                 required=q.required,
                 order=q.order,

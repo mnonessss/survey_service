@@ -13,6 +13,7 @@ import {
   Title,
 } from "@vkontakte/vkui";
 import { api, getAccessToken, initCsrf } from "../api/client";
+import { AuthenticatedImage } from "../components/AuthenticatedImage";
 import { getAnswerImageUrls } from "../utils/answerImages";
 import { questionTypeLabel } from "../utils/questionHints";
 
@@ -99,7 +100,7 @@ export default function SurveyResponses() {
       >
         {lightboxSrc && (
           <div className="vk-lightbox-viewport">
-            <img src={lightboxSrc} alt="Ответ" className="vk-lightbox-img" />
+            <AuthenticatedImage src={lightboxSrc} alt="Ответ" className="vk-lightbox-img" />
           </div>
         )}
       </ModalCard>
@@ -160,7 +161,7 @@ export default function SurveyResponses() {
                     <td>{formatDate(row.completed_at)}</td>
                     {data.questions.map((q: any) => {
                       const answer = row.answers.find((a: any) => a.question_id === q.id);
-                      const imageUrls = getAnswerImageUrls(answer, q.question_type);
+                      const imageUrls = getAnswerImageUrls(answer, q.question_type, { surveyId: id });
                       const value = answer?.display_value ?? "—";
                       return (
                         <td key={q.id}>
@@ -174,7 +175,11 @@ export default function SurveyResponses() {
                                   onClick={() => setLightboxSrc(url)}
                                   aria-label="Увеличить изображение"
                                 >
-                                  <img src={url} alt="Ответ" className="vk-response-thumb" />
+                                  <AuthenticatedImage
+                                    src={url}
+                                    alt="Ответ"
+                                    className="vk-response-thumb"
+                                  />
                                 </button>
                               ))}
                             </div>
