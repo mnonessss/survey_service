@@ -15,7 +15,7 @@ import {
   Spinner,
   Title,
 } from "@vkontakte/vkui";
-import { Icon24ChevronDown, Icon24ChevronUp, Icon24DeleteOutline } from "@vkontakte/icons";
+import { Icon24ChevronDown, Icon24ChevronUp, Icon24CopyOutline, Icon24DeleteOutline } from "@vkontakte/icons";
 import { api, getAccessToken, initCsrf } from "../api/client";
 import { QuestionTypeSelect } from "../components/QuestionTypeSelect";
 import { questionTypeLabel } from "../utils/questionHints";
@@ -66,6 +66,7 @@ export default function SurveyEditor() {
   const [surveyTitle, setSurveyTitle] = useState("");
   const [questions, setQuestions] = useState<any[]>([]);
   const [links, setLinks] = useState<any[]>([]);
+  const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
   const [qTitle, setQTitle] = useState("");
   const [qType, setQType] = useState("TEXT");
   const [qRequired, setQRequired] = useState(false);
@@ -359,6 +360,18 @@ export default function SurveyEditor() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const copyLink = async (linkId: string, url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedLinkId(linkId);
+      window.setTimeout(() => {
+        setCopiedLinkId((current) => (current === linkId ? null : current));
+      }, 2000);
+    } catch {
+      setError("Не удалось скопировать ссылку");
     }
   };
 
@@ -758,7 +771,24 @@ export default function SurveyEditor() {
           <Placeholder>Активных ссылок пока нет</Placeholder>
         ) : (
           links.map((l) => (
-            <SimpleCell key={l.id} subtitle={l.public_url} href={l.public_url} target="_blank">
+            <SimpleCell
+              key={l.id}
+              subtitle={copiedLinkId === l.id ? "Скопировано в буфер обмена" : l.public_url}
+              href={l.public_url}
+              target="_blank"
+              after={
+                <IconButton
+                  aria-label="Скопировать ссылку"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    void copyLink(l.id, l.public_url);
+                  }}
+                >
+                  <Icon24CopyOutline />
+                </IconButton>
+              }
+            >
               Ссылка на опрос
             </SimpleCell>
           ))
