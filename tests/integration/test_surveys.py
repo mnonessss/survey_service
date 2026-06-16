@@ -50,3 +50,22 @@ async def test_survey_crud_flow(client: AsyncClient, auth_headers: dict[str, str
 async def test_list_surveys_requires_auth(client: AsyncClient):
     response = await client.get("/surveys/")
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_delete_survey_removes_it_from_list(client: AsyncClient, auth_headers: dict[str, str]):
+    create = await client.post(
+        "/surveys/",
+        headers=auth_headers,
+        json={"title": "Опрос для удаления", "description": ""},
+    )
+    assert create.status_code == 200, create.text
+    survey_id = create.json()["id"]
+
+    remove = await client.delete(f"/surveys/{survey_id}", headers=auth_headers)
+    assert remove.status_code == 200, remove.text
+
+    listed = await client.get("/surveys/", headers=auth_headers)
+    assert listed.status_code == 200
+    ids = [item["id"] for item in listed.json()]
+    assert survey_id not in ids

@@ -13,7 +13,10 @@ from app.api import responses as responses_api
 from app.api import uploads as uploads_api
 from app.db.database import get_db
 from app.models.enums import SurveyStatus, UserRole
+from app.models.answer import Answer
 from app.models.question import Question
+from app.models.question_option import QuestionOption
+from app.models.response_session import ResponseSession
 from app.models.survey import Survey
 from app.models.survey_links import SurveyLinks
 from app.models.user import User
@@ -152,13 +155,23 @@ async def delete_survey(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    stmt = delete(Survey).where(Survey.id == survey_id)
+    exists_stmt = select(Survey.id).where(Survey.id == survey_id)
     if current_user.role != UserRole.ADMIN:
-        stmt = stmt.where(Survey.created_by == current_user.id)
-
-    result = await db.execute(stmt)
-    if result.rowcount == 0:
+        exists_stmt = exists_stmt.where(Survey.created_by == current_user.id)
+    existing = await db.execute(exists_stmt)
+    if not existing.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Survey not found")
+
+    question_ids_subq = select(Question.id).where(Question.survey_id == survey_id)
+    session_ids_subq = select(ResponseSession.id).where(ResponseSession.survey_id == survey_id)
+
+    # Remove dependent data explicitly to avoid FK conflicts.
+    await db.execute(delete(Answer).where(Answer.session_id.in_(session_ids_subq)))
+    await db.execute(delete(ResponseSession).where(ResponseSession.survey_id == survey_id))
+    await db.execute(delete(SurveyLinks).where(SurveyLinks.survey_id == survey_id))
+    await db.execute(delete(QuestionOption).where(QuestionOption.question_id.in_(question_ids_subq)))
+    await db.execute(delete(Question).where(Question.survey_id == survey_id))
+    await db.execute(delete(Survey).where(Survey.id == survey_id))
 
     await db.commit()
     return {"message": "Survey deleted successfully"}
