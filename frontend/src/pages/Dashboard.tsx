@@ -5,12 +5,14 @@ import {
   FormItem,
   Group,
   Header,
+  IconButton,
   Input,
   Placeholder,
   SimpleCell,
   Spacing,
   Title,
 } from "@vkontakte/vkui";
+import { Icon24DeleteOutline } from "@vkontakte/icons";
 import { api, initCsrf } from "../api/client";
 
 type Survey = { id: string; title: string; status: string };
@@ -32,6 +34,7 @@ export default function Dashboard() {
   const [title, setTitle] = useState("");
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = () => api.getSurveys().then(setSurveys).catch((e) => setError(String(e)));
 
@@ -50,6 +53,22 @@ export default function Dashboard() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setCreating(false);
+    }
+  };
+
+  const removeSurvey = async (surveyId: string) => {
+    if (deletingId) return;
+    const confirmed = window.confirm("Удалить опрос? Это действие нельзя отменить.");
+    if (!confirmed) return;
+    setError("");
+    setDeletingId(surveyId);
+    try {
+      await api.deleteSurvey(surveyId);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -90,6 +109,18 @@ export default function Dashboard() {
               onClick={() => navigate(`/surveys/${s.id}`)}
               chevron="always"
               multiline
+              after={
+                <IconButton
+                  aria-label="Удалить опрос"
+                  disabled={deletingId === s.id}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void removeSurvey(s.id);
+                  }}
+                >
+                  <Icon24DeleteOutline />
+                </IconButton>
+              }
             >
               {s.title}
             </SimpleCell>
