@@ -68,4 +68,4 @@ def test_missing_required_answer_rejected():
     question = _question(QuestionType.TEXT, required=True)
     with pytest.raises(HTTPException) as exc:
         validate_answers_for_submit([question], [], require_all_required=True)
-    assert "missing required" in exc.value.detail.lower()
+    assert "обязательный вопрос" in exc.value.detail.lower()

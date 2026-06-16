@@ -83,6 +83,7 @@ export default function PublicSurvey() {
   const [multiAnswers, setMultiAnswers] = useState<Record<string, string[]>>({});
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
+  const [invalidRequiredIds, setInvalidRequiredIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [resuming, setResuming] = useState(false);
@@ -228,14 +229,38 @@ export default function PublicSurvey() {
     </div>
   );
 
+  const isAnswered = (q: any) => {
+    if (q.question_type === "MULTIPLE_CHOICE" || q.question_type === "IMAGE_UPLOAD_MULTIPLE") {
+      return (multiAnswers[q.id] || []).length > 0;
+    }
+    return Boolean((answers[q.id] || "").trim());
+  };
+
+  const validateRequiredQuestions = () => {
+    const missingIds = (survey?.questions || [])
+      .filter((q: any) => q.required)
+      .filter((q: any) => !isAnswered(q))
+      .map((q: any) => q.id);
+    setInvalidRequiredIds(missingIds);
+    return missingIds;
+  };
+
   const submit = async () => {
     if (!sessionId || !sessionToken || !survey || submitting) return;
     setError("");
+    const missingIds = validateRequiredQuestions();
+    if (missingIds.length) {
+      setError("Заполните обязательные вопросы");
+      const firstMissing = document.getElementById(`question-${missingIds[0]}`);
+      firstMissing?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = buildAnswerPayload(survey.questions, answers, multiAnswers);
       await api.submitSurvey(sessionId, sessionToken, payload);
       if (token) clearStoredSession(token);
+      setInvalidRequiredIds([]);
       setDone(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -318,14 +343,21 @@ export default function PublicSurvey() {
       ) : (
         <>
           {survey.questions.map((q: any) => (
-            <Group key={q.id}>
+            <div key={q.id} id={`question-${q.id}`}>
+              <Group className={invalidRequiredIds.includes(q.id) ? "vk-required-question" : undefined}>
               {questionHint(q.question_type) && (
                 <FormItem>
                   <p className="vk-question-hint">{questionHint(q.question_type)}</p>
                 </FormItem>
               )}
               <FormItem>
-                <p className="vk-question-title">
+                <p
+                  className={
+                    invalidRequiredIds.includes(q.id)
+                      ? "vk-question-title vk-question-title--required-error"
+                      : "vk-question-title"
+                  }
+                >
                   {q.title}
                   {q.required ? " *" : ""}
                 </p>
@@ -494,7 +526,8 @@ export default function PublicSurvey() {
                   </div>
                 </FormItem>
               )}
-            </Group>
+              </Group>
+            </div>
           ))}
 
           {error && (

@@ -49,6 +49,15 @@ body,
   color: #000;
 }
 
+.vk-required-question {
+  border: 1px solid var(--vkui--color_stroke_negative);
+  border-radius: 12px;
+}
+
+.vk-question-title--required-error {
+  color: var(--vkui--color_text_negative);
+}
+
 .vk-image-choice-item {
   display: flex;
   flex-direction: column;

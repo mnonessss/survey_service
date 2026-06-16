@@ -41,13 +41,13 @@ def validate_answers_for_submit(
             if not isinstance(values, list):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Question {question.id} requires option values",
+                    detail="Не выбран обязательный вариант ответа",
                 )
             if not values:
                 if question.required:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Question {question.id} requires option values",
+                        detail="Не выбран обязательный вариант ответа",
                     )
                 continue
             if question.question_type == QuestionType.SINGLE_CHOICE and len(values) != 1:
@@ -61,7 +61,7 @@ def validate_answers_for_submit(
                 if require_all_required and question.required:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Question {question.id} requires an answer",
+                        detail="Обязательный вопрос не заполнен",
                     )
                 continue
             for value in values:
@@ -76,7 +76,7 @@ def validate_answers_for_submit(
                 if require_all_required and question.required:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Question {question.id} requires an answer",
+                        detail="Обязательный вопрос не заполнен",
                     )
                 if not question.required:
                     continue
@@ -106,7 +106,7 @@ def validate_answers_for_submit(
             if question.required and question.id not in submitted:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Missing required answer for question {question.id}",
+                    detail="Обязательный вопрос не заполнен",
                 )
 
     return submitted
